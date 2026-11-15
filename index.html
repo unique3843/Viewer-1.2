@@ -146,6 +146,7 @@ button.th.chk .im::after{content:"✓";position:absolute;left:4px;top:4px;width:
 #dlg::backdrop{background:rgba(0,0,0,.45)}
 #dl{display:flex;flex-direction:column;gap:6px;margin:10px 0}
 #dl button{text-align:left;white-space:normal}
+button.th.last .nm::before{content:"▶ ";color:var(--ac)}
 #pdfp{align-items:flex-start}.pp{margin-inline:auto}
 @media (pointer:coarse){button{min-height:38px}.chip{min-height:30px}.tr{padding:9px 8px 9px 6px}.kbd{display:none}}
 @media (max-width:760px){
@@ -848,6 +849,7 @@ function applyImg(){
   imgEl.style.width=nat0.w+'px';imgEl.style.height=nat0.h+'px';
   imgEl.style.transform=`translate(${itx}px,${ity}px) scale(${iz}) rotate(${irot}deg)`;
   imgEl.style.imageRendering=iz>=3?'pixelated':'auto';
+  if(imgReady&&cur&&cur.kind==='img')posSet(cur,ifit?{fit:1}:{fit:0,z:iz,x:itx,y:ity,r:irot});
   zui();
 }
 function fitImg(){iz=imgBase();itx=ity=0;ifit=true;applyImg()}
@@ -860,6 +862,7 @@ function zoomImg(z2,cx,cy){
 }
 async function openImg(it,my){
   setMode('img');clearMsg();
+  const sp=posOf(it);imgReady=false;
   busy('이미지 여는 중…');
   let url=it.url;
   try{
@@ -877,7 +880,9 @@ async function openImg(it,my){
   }catch(e){return fail(my,'이 파일을 열 수 없어요\n'+(e&&e.message?e.message:e)+(it.ext==='.heic'||it.ext==='.heif'?'\n(HEIC는  pip install pillow-heif  가 필요해요)':''))}
   if(my!==otk)return;
   nat0={w:imgEl.naturalWidth||800,h:imgEl.naturalHeight||600};irot=0;
-  imgEl.style.visibility='';fitImg();busy(null);
+  imgEl.style.visibility='';fitImg();
+  if(sp&&sp.fit===0&&sp.z){irot=sp.r||0;iz=sp.z;itx=sp.x||0;ity=sp.y||0;ifit=false;applyImg()}
+  imgReady=true;busy(null);
   let t=`${nat0.w} × ${nat0.h} px`;if(it.size)t+=' · '+fmtSize(it.size);
   if(it.ext==='.pxd')t+=' · PXD는 저장된 미리보기 이미지를 보여줘요';
   $('#info').textContent=t;
@@ -959,7 +964,7 @@ async function pdfLoad(w,tk){
   }catch(e){}finally{w._b=false}
 }
 function pdfUnload(w){if(!w._d)return;w.replaceChildren();w._d=false}
-function uiPdf(){$('#num').textContent=pdfPage+' / '+pdfN;sl.max=pdfN;sl.value=pdfPage}
+function uiPdf(){$('#num').textContent=pdfPage+' / '+pdfN;sl.max=pdfN;sl.value=pdfPage;if(pdfReady&&cur&&cur.kind==='pdf')posSet(cur,{p:pdfPage})}
 function pdfGo(n){n=Math.max(1,Math.min(pdfN,n));const w=pdfW[n-1];if(w)vpdf.scrollTop=w.offsetTop-14}
 function setPdfZoom(z){
   z=Math.max(.4,Math.min(4,z));if(z===pdfZ)return;pdfZ=z;zui();
@@ -968,6 +973,7 @@ function setPdfZoom(z){
 }
 async function openPdf(it,my){
   setMode('pdf');clearMsg();busy('PDF 여는 중…',0);
+  const sp=posOf(it);pdfReady=false;
   let doc;
   try{
     await loadPdfjs();if(my!==otk)return;
@@ -979,6 +985,8 @@ async function openPdf(it,my){
   closePdf();pdfDoc=doc;pdfN=doc.numPages;pdfPage=1;pdfZ=1;
   try{const g=await doc.getPage(1),v=g.getViewport({scale:1});pdfRatio=v.height/v.width}catch(e){}
   vpdf.scrollTop=0;buildPdf(false);uiPdf();zui();busy(null);
+  if(sp&&sp.p>1)requestAnimationFrame(()=>pdfGo(Math.min(sp.p,pdfN)));
+  setTimeout(()=>{if(my===otk)pdfReady=true},500);
   $('#info').textContent=`PDF · ${pdfN}쪽`+(it.size?' · '+fmtSize(it.size):'');
 }
 async function pdfThumb(it){
@@ -1036,7 +1044,7 @@ function setTitle(){
 }
 async function openItem(it){
   if(!it)return;
-  const my=++otk;cur=it;markActive();setTitle();
+  const my=++otk;cur=it;markActive();setTitle();posMark(it);
   $('#info').textContent='';
   if(it.kind==='3d')await open3d(it,my);
   else if(it.kind==='img')await openImg(it,my);
@@ -1127,10 +1135,10 @@ function renderList(){
     im.append(ph,bd);
     const nm=document.createElement('span');nm.className='nm';nm.textContent=it.name;
     const mt=document.createElement('span');mt.className='mt';mt.textContent=fmtSize(it.size)||'\u00a0';
-    b.append(im,nm,mt);if(selSet.has(it))b.classList.add('chk');f.append(b);thEls.set(it,b);so.observe(b);
+    b.append(im,nm,mt);if(selSet.has(it))b.classList.add('chk');if((POS[ctxKey()+'|dir|'+it.dir]||{}).rel===it.rel)b.classList.add('last');f.append(b);thEls.set(it,b);so.observe(b);
   });
   if(libMode&&!vis.length){const d=document.createElement('div');d.className='emp';d.textContent=items.length?'조건에 맞는 파일이 없어요':'위의 [＋ 파일]로 파일을 추가하세요';f.append(d)}
-  lst.append(f);markActive();
+  lst.append(f);markActive();posScroll();
 }
 let lpT=null,lpDone=false;
 lst.onclick=e=>{
@@ -1218,7 +1226,8 @@ function setItems(list,name,opt){
   const keepIt=prev&&items.find(x=>x.rel===prev);
   if(keepIt){cur=keepIt;markActive();setTitle();return}
   const sel=opt.select&&items.find(x=>x.rel===opt.select);
-  if(opt.noopen)setTitle();else openItem(sel||vis[0]||items[0]);
+  if(opt.noopen)setTitle();
+  else{let t=sel||null,rs=false;if(!t&&!libMode){const l=POS[ctxKey()+'|*'];t=l&&items.find(x=>x.rel===l.rel);rs=!!t}openItem(t||vis[0]||items[0]);if(rs)toast('이어보기: '+t.name)}
 }
 function applyScan(r,keep){
   if(!r||!r.files)return;
@@ -1363,6 +1372,35 @@ addEventListener('keydown',e=>{
   if(h)e.preventDefault();
 });
 
+/* ---------------------------------------------------------------- 이어보기 (보던 파일·위치 기억) */
+const POSK='v3dpos';let POS={},posT=null,imgReady=false,pdfReady=false;
+try{POS=JSON.parse(localStorage.getItem(POSK)||'{}')}catch(e){}
+const ctxKey=()=>libMode?'lib':'d:'+folderName;
+function posSave(){
+  clearTimeout(posT);
+  posT=setTimeout(()=>{
+    const ks=Object.keys(POS);
+    if(ks.length>600)ks.sort((a,b)=>(POS[a].t||0)-(POS[b].t||0)).slice(0,ks.length-500).forEach(k=>delete POS[k]);
+    try{localStorage.setItem(POSK,JSON.stringify(POS))}catch(e){}
+  },400);
+}
+const posOf=it=>POS[ctxKey()+'|f|'+it.rel];
+function posSet(it,o){const k=ctxKey()+'|f|'+it.rel;POS[k]=Object.assign({},POS[k],o,{t:Date.now()});posSave()}
+function posMark(it){
+  const c=ctxKey(),t=Date.now();
+  POS[c+'|*']={rel:it.rel,t};POS[c+'|dir|'+it.dir]={rel:it.rel,t};posSave();
+  thEls.forEach((b,x)=>{if(x.dir===it.dir)b.classList.toggle('last',x===it)});
+}
+function posScroll(){
+  const t=lst.querySelector('.th.last');
+  if(t&&!q&&!cur)lst.scrollTop=Math.max(0,t.offsetTop-lst.offsetTop-lst.clientHeight/3);
+}
+function resumeLib(){ /* 앱을 다시 켜면 보던 파일부터 */
+  const l=POS['lib|*'],it=l&&items.find(x=>x.rel===l.rel);
+  if(!it)return;
+  mobSide=false;syncSide();openItem(it);toast('이어보기: '+it.name);
+}
+
 /* ---------------------------------------------------------------- 보관함 (폰/웹앱: 가져온 파일을 브라우저 저장소에 보관) */
 let libMode=false,libDirs=[],selMode=false,selSet=new Set(),mobSide=true,idbP=null;
 const libPre=()=>fsel?fsel+'/':'';
@@ -1400,7 +1438,7 @@ async function loadLib(opt){
   });
   setSel(false);
   const gone=cur&&!list.some(x=>x.rel===cur.rel);
-  if(list.length)setItems(list,'내 보관함',{keep:opt.keep&&!gone,noopen:true});
+  if(list.length){setItems(list,'내 보관함',{keep:opt.keep&&!gone,noopen:true});if(!opt.keep)resumeLib()}
   else{
     ++otk;cur=null;busy(null);clearMsg();if(R)clearModel();imgEl.removeAttribute('src');closePdf();
     items=[];folderName='내 보관함';fsel='';tree=buildTree();
