@@ -82,6 +82,7 @@ body.m-3d #t3{display:flex}
 #zl{color:var(--fg)}
 body:not(.m-3d) .only3d,body:not(.m-img) .onlyimg,body:not(.m-pdf) .onlypdf,body:not(.m-img):not(.m-pdf) .onlyzoom{display:none}
 body.empty #bot{display:none}
+body.arc.m-img #sl,body.arc.m-img #num{display:inline-block!important}
 
 #v3d,#vimg,#vpdf{position:absolute;inset:0;display:none}
 body.m-3d #v3d,body.m-img #vimg,body.m-pdf #vpdf{display:block}
@@ -215,7 +216,7 @@ button.th.last .nm::before{content:"▶ ";color:var(--ac)}
       <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>
       <p class="big">폴더나 파일을 끌어다 놓으세요</p>
       <div class="row"><button id="open3" class="on">폴더 열기</button><button id="open2">파일 열기</button></div>
-      <p class="sub">3D: STL · OBJ · 3MF · PLY · GLB/GLTF · FBX · DAE · 3DS · WRL · AMF · GCODE · OFF · STEP/IGES<br>이미지: PNG · JPG · WEBP · BMP · GIF · TIF/TIFF · PSD · PXD · SVG · AVIF · ICO · TGA · DDS …<br>문서: PDF</p>
+      <p class="sub">3D: STL · OBJ · 3MF · PLY · GLB/GLTF · FBX · DAE · 3DS · WRL · AMF · GCODE · OFF · STEP/IGES<br>이미지: PNG · JPG · WEBP · BMP · GIF · TIF/TIFF · PSD · PXD · SVG · AVIF · ICO · TGA · DDS …<br>문서: PDF · 압축: ZIP · CBZ (풀지 않고 안의 이미지를 바로)</p>
       <p class="sub">폴더를 열면 안의 파일(하위 폴더 포함)이 왼쪽에 미리보기로 나열되고, 폴더별로 골라 볼 수 있어요</p>
       <p class="sub kbd">3D: 1~7 보기 방향 · 0 맞춤 · W 와이어 · G 격자 · R 자동회전 · P 직교 · C 캡처<br>← → 이전/다음 파일 · T 목록 · F 전체화면 · O 파일 열기</p>
     </div></div>
@@ -242,8 +243,8 @@ button.th.last .nm::before{content:"▶ ";color:var(--ac)}
 
 <script type="module">
 const $=s=>document.querySelector(s),B=document.body;
-const EXT={"d3": [".3ds", ".3mf", ".amf", ".brep", ".dae", ".fbx", ".gcode", ".glb", ".gltf", ".iges", ".igs", ".obj", ".off", ".ply", ".step", ".stl", ".stp", ".wrl"], "img": [".avif", ".bmp", ".gif", ".ico", ".jfif", ".jpeg", ".jpg", ".png", ".svg", ".webp"], "conv": [".dds", ".heic", ".heif", ".j2k", ".jp2", ".pbm", ".pcx", ".pgm", ".ppm", ".psb", ".psd", ".pxd", ".tga", ".tif", ".tiff"], "pdf": [".pdf"]};
-const ALLX=[].concat(EXT.d3,EXT.img,EXT.conv,EXT.pdf);
+const EXT={"d3": [".3ds", ".3mf", ".amf", ".brep", ".dae", ".fbx", ".gcode", ".glb", ".gltf", ".iges", ".igs", ".obj", ".off", ".ply", ".step", ".stl", ".stp", ".wrl"], "img": [".avif", ".bmp", ".gif", ".ico", ".jfif", ".jpeg", ".jpg", ".png", ".svg", ".webp"], "conv": [".dds", ".heic", ".heif", ".j2k", ".jp2", ".pbm", ".pcx", ".pgm", ".ppm", ".psb", ".psd", ".pxd", ".tga", ".tif", ".tiff"], "pdf": [".pdf"], "arc": [".cbz", ".zip"]};
+const ALLX=[].concat(EXT.d3,EXT.img,EXT.conv,EXT.pdf,EXT.arc);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const COARSE=matchMedia('(pointer:coarse)').matches,MOB=matchMedia('(max-width:760px)');
 const DEF={side:true,sidew:300,thw:104,bg:'#2b2e35',br:1,color:'#aab7c9',shade:'solid',grid:true,axes:false,ortho:false,dbl:true,auto:false,sort:'name',chk:false};
@@ -255,7 +256,7 @@ document.documentElement.style.setProperty('--thw',S.thw+'px');
 
 const fmtSize=n=>!n?'':n<1024?n+' B':n<1048576?(n/1024).toFixed(0)+' KB':n<1073741824?(n/1048576).toFixed(1)+' MB':(n/1073741824).toFixed(2)+' GB';
 const extOf=n=>{const i=n.lastIndexOf('.');return i<0?'':n.slice(i).toLowerCase()};
-const kindOfExt=e=>EXT.d3.includes(e)?'3d':(EXT.img.includes(e)||EXT.conv.includes(e))?'img':EXT.pdf.includes(e)?'pdf':null;
+const kindOfExt=e=>EXT.d3.includes(e)?'3d':(EXT.img.includes(e)||EXT.conv.includes(e))?'img':EXT.pdf.includes(e)?'pdf':EXT.arc.includes(e)?'arc':null;
 const dirOf=r=>{const i=r.lastIndexOf('/');return i<0?'':r.slice(0,i)};
 const nat=new Intl.Collator(undefined,{numeric:true,sensitivity:'base'});
 const cmpRel=(a,b)=>{
@@ -1001,7 +1002,7 @@ async function pdfThumb(it){
     return c.toDataURL('image/jpeg',.8);
   }finally{try{d.destroy()}catch(e){}}
 }
-sl.oninput=()=>pdfGo(+sl.value);
+sl.oninput=()=>{if(arc&&cur===arc.it&&B.classList.contains('arc'))showArc(+sl.value-1);else pdfGo(+sl.value)};
 let pp0=null;const tdist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY)||1;
 vpdf.style.touchAction='pan-x pan-y';
 vpdf.addEventListener('touchstart',e=>{pp0=e.touches.length===2?{d:tdist(e.touches),z:pdfZ}:null},{passive:true});
@@ -1010,7 +1011,7 @@ vpdf.addEventListener('touchend',()=>{pp0=null});
 
 /* ---------------------------------------------------------------- 공통: 모드 전환 / 확대 표시 */
 function setMode(m){
-  B.classList.remove('empty','m-3d','m-img','m-pdf');B.classList.add('m-'+m);
+  B.classList.remove('empty','m-3d','m-img','m-pdf','arc');B.classList.add('m-'+m);
   if(m!=='pdf')closePdf();
   if(m==='3d')syncTools();
   zui();
@@ -1048,9 +1049,11 @@ async function openItem(it){
   $('#info').textContent='';
   if(it.kind==='3d')await open3d(it,my);
   else if(it.kind==='img')await openImg(it,my);
+  else if(it.kind==='arc')await openArc(it,my);
   else await openPdf(it,my);
 }
 function step(d){
+  if(arc&&cur===arc.it){const n=arc.idx+d;if(n>=0&&n<arc.a.entries.length){showArc(n);return}} /* 압축 파일 안에서는 쪽 단위로 */
   if(!vis.length)return;
   let i=vis.indexOf(cur);if(i<0)i=d>0?-1:vis.length;
   const n=Math.max(0,Math.min(vis.length-1,i+d));
@@ -1074,9 +1077,9 @@ function buildTree(){
   return nodes;
 }
 function renderKinds(){
-  const cnt={all:items.length,'3d':0,img:0,pdf:0};items.forEach(it=>cnt[it.kind]++);
+  const cnt={all:items.length,'3d':0,img:0,pdf:0,arc:0};items.forEach(it=>cnt[it.kind]++);
   const k=$('#kinds');k.replaceChildren();
-  [['all','전체'],['3d','3D'],['img','이미지'],['pdf','PDF']].forEach(([v,t])=>{
+  [['all','전체'],['3d','3D'],['img','이미지'],['pdf','PDF'],['arc','압축']].forEach(([v,t])=>{
     if(v!=='all'&&!cnt[v])return;
     const b=document.createElement('button');b.className='chip'+(kindF===v?' on':'');b.dataset.k=v;b.textContent=`${t} ${cnt[v]}`;k.append(b);
   });
@@ -1130,7 +1133,7 @@ function renderList(){
     if(grouped&&it.dir!==last){last=it.dir;const h=document.createElement('div');h.className='gh';h.textContent=it.dir||folderName||'/';f.append(h)}
     const b=document.createElement('button');b.className='th';b._it=it;b.title=it.rel;
     const im=document.createElement('span');im.className='im';
-    const ph=document.createElement('span');ph.className='ph';ph.textContent=it.kind==='3d'?'3D':it.kind==='pdf'?'PDF':'';
+    const ph=document.createElement('span');ph.className='ph';ph.textContent=it.kind==='3d'?'3D':it.kind==='pdf'?'PDF':it.kind==='arc'?'ZIP':'';
     const bd=document.createElement('i');bd.className='bd';bd.textContent=it.ext.slice(1).toUpperCase();
     im.append(ph,bd);
     const nm=document.createElement('span');nm.className='nm';nm.textContent=it.name;
@@ -1174,7 +1177,7 @@ function thumbFor(it,im){
     while($('#busy').classList.contains('on')&&im.isConnected)await sleep(250);
     if(!im.isConnected)return;
     try{
-      const u=it.kind==='3d'?await thumb3d(it):it.kind==='pdf'?await pdfThumb(it):await convertItem(it,'thumb');
+      const u=it.kind==='3d'?await thumb3d(it):it.kind==='pdf'?await pdfThumb(it):it.kind==='arc'?await arcThumb(it):await convertItem(it,'thumb');
       if(u){thumbCache.set(it,u);if(it.lib&&u.startsWith('data:'))libSetThumb(it,u);if(im.isConnected)putThumb(im,u,it)}
     }catch(e){console.warn('미리보기 실패:',it.name,e)}
   }).finally(()=>pend.delete(it));
@@ -1371,6 +1374,88 @@ addEventListener('keydown',e=>{
   }else h=false;
   if(h)e.preventDefault();
 });
+
+/* ---------------------------------------------------------------- 압축 파일(ZIP/CBZ): 풀지 않고 안의 이미지를 한 장씩 꺼내 본다 */
+let arc=null;
+const AIMG=/\.(jpe?g|jfif|png|webp|gif|bmp|avif)$/i;
+const AMIME={'.jpg':'image/jpeg','.jpeg':'image/jpeg','.jfif':'image/jpeg','.png':'image/png','.webp':'image/webp','.gif':'image/gif','.bmp':'image/bmp','.avif':'image/avif'};
+async function arcOpen(it){
+  if(it._arc)return it._arc;
+  const rd=it.blob?{size:it.file.size,read:(a,b)=>it.file.slice(a,b).arrayBuffer()}
+    :{size:it.size,read:async(a,b)=>{const r=await fetch(it.url,{headers:{Range:'bytes='+a+'-'+(b-1)}});if(!r.ok)throw new Error('파일을 읽을 수 없어요');const x=await r.arrayBuffer();return r.status===206?x:x.slice(a,b)}};
+  const tn=Math.min(rd.size,65557),tail=new DataView(await rd.read(rd.size-tn,rd.size));
+  let p=-1;for(let i=tn-22;i>=0;i--)if(tail.getUint32(i,true)===0x06054b50){p=i;break}
+  if(p<0)throw new Error('ZIP 파일이 아니거나 손상됐어요');
+  const n=tail.getUint16(p+10,true),cdSize=tail.getUint32(p+12,true),cdOff=tail.getUint32(p+16,true);
+  if(cdOff===0xffffffff||n===0xffff)throw new Error('4GB가 넘는 ZIP은 아직 열 수 없어요');
+  const cd=new DataView(await rd.read(cdOff,cdOff+cdSize)),u8=new Uint8Array(cd.buffer),ent=[];
+  const dU=new TextDecoder('utf-8',{fatal:true}),dK=new TextDecoder('euc-kr'); /* 한글 윈도우 ZIP(CP949)도 읽기 */
+  for(let o=0,k=0;k<n&&o+46<=cd.byteLength;k++){
+    if(cd.getUint32(o,true)!==0x02014b50)break;
+    const flag=cd.getUint16(o+8,true),method=cd.getUint16(o+10,true),cs=cd.getUint32(o+20,true),us=cd.getUint32(o+24,true);
+    const nl=cd.getUint16(o+28,true),el=cd.getUint16(o+30,true),cl=cd.getUint16(o+32,true),off=cd.getUint32(o+42,true);
+    const nb=u8.subarray(o+46,o+46+nl);let name;
+    try{name=dU.decode(nb)}catch(e){name=dK.decode(nb)}
+    ent.push({name,method,cs,us,off,flag});o+=46+nl+el+cl;
+  }
+  const entries=ent.filter(e=>AIMG.test(e.name)&&!e.name.endsWith('/')&&!e.name.includes('__MACOSX/')&&!e.name.slice(e.name.lastIndexOf('/')+1).startsWith('.'))
+    .sort((a,b)=>nat.compare(a.name,b.name));
+  return it._arc={rd,entries};
+}
+async function arcRead(a,e){
+  if(e.flag&1)throw new Error('암호가 걸린 ZIP은 열 수 없어요');
+  const h=new DataView(await a.rd.read(e.off,e.off+30));
+  if(h.getUint32(0,true)!==0x04034b50)throw new Error('ZIP 항목을 읽을 수 없어요');
+  const s=e.off+30+h.getUint16(26,true)+h.getUint16(28,true),raw=await a.rd.read(s,s+e.cs);
+  const type=AMIME[extOf(e.name)]||'application/octet-stream';
+  if(e.method===0)return new Blob([raw],{type});
+  if(e.method!==8)throw new Error('지원하지 않는 압축 방식이에요');
+  if(!window.DecompressionStream)throw new Error('이 브라우저는 ZIP 해제를 지원하지 않아요 (최신 버전으로 업데이트해 주세요)');
+  const out=await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
+  return new Blob([out],{type});
+}
+async function arcThumb(it){ /* 첫 쪽으로 목록 미리보기 */
+  const a=await arcOpen(it),e=a.entries[0];if(!e)return null;
+  const u=URL.createObjectURL(await arcRead(a,e));
+  try{
+    const im=await new Promise((ok,no)=>{const g=new Image();g.onload=()=>ok(g);g.onerror=no;g.src=u});
+    const s=Math.min(1,260/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(im.naturalWidth*s));c.height=Math.max(1,Math.round(im.naturalHeight*s));
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    return c.toDataURL('image/jpeg',.8);
+  }finally{URL.revokeObjectURL(u)}
+}
+async function openArc(it,my){
+  setMode('img');clearMsg();busy('압축 파일 여는 중…');
+  let a;
+  try{a=await arcOpen(it)}catch(e){return fail(my,'이 파일을 열 수 없어요\n'+(e&&e.message?e.message:e))}
+  if(my!==otk)return;
+  if(!a.entries.length)return fail(my,'압축 파일 안에 볼 수 있는 이미지가 없어요');
+  const sp=posOf(it);
+  arc={it,a,idx:0,cu:null};
+  showArc(Math.max(0,Math.min((sp&&sp.pg)||0,a.entries.length-1)));
+}
+async function showArc(i){
+  if(!arc)return;
+  const my=++otk,A=arc,e=A.a.entries[i];A.idx=i;
+  let b;
+  try{b=await arcRead(A.a,e)}catch(err){return fail(my,'이 쪽을 열 수 없어요\n'+(err&&err.message?err.message:err))}
+  if(my!==otk)return;
+  const old=A.cu;A.cu=URL.createObjectURL(b);
+  await openImg({name:e.name,rel:A.it.rel+'#'+e.name,ext:extOf(e.name),kind:'img',size:e.us,url:A.cu,blob:true,conv:false,dir:''},my);
+  if(old)URL.revokeObjectURL(old);
+  if(my!==otk)return;
+  B.classList.add('arc');
+  $('#info').textContent=e.name+' · '+$('#info').textContent;
+  arcNav();posSet(A.it,{pg:i});
+}
+function arcNav(){
+  if(!arc||cur!==arc.it)return;
+  const n=arc.a.entries.length,i=arc.idx,k=vis.indexOf(cur);
+  $('#navn').textContent=(i+1)+' / '+n;
+  $('#prev').disabled=i===0&&!(k>0);$('#next').disabled=i===n-1&&!(k>=0&&k<vis.length-1);
+  sl.max=n;sl.value=i+1;$('#num').textContent=(i+1)+' / '+n;
+}
 
 /* ---------------------------------------------------------------- 이어보기 (보던 파일·위치 기억) */
 const POSK='v3dpos';let POS={},posT=null,imgReady=false,pdfReady=false;
